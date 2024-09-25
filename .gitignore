@@ -1,0 +1,9 @@
+__pycache__/
+.idea/
+cif_file/
+zeoliteNISTdata/
+*.csv
+*.pkl
+*.png
+*.xlsx
+*.pth
