@@ -125,11 +125,13 @@ class FullModel(nn.Module):
 
         # 处理温度和压力输入的全连接层
         self.fc_temp_pressure = nn.Linear(temp_pressure_dim, alignn_output_dim)
+        #self.batch_norm = BatchNorm1d(16)
 
         # 最后预测吸附量的全连接层
         self.fc1 = nn.Linear(2 * alignn_output_dim, 16)
-        self.fc2 = nn.Linear(16, 32)
-        self.fc3 = nn.Linear(32, 16)
+        self.fc2 = nn.Linear(16, 16)
+        #self.fc2 = nn.Linear(16, 32)
+        #self.fc3 = nn.Linear(32, 16)
         self.final = nn.Linear(16, 1)
 
     def forward(self, data, temp_pressure):
@@ -141,13 +143,13 @@ class FullModel(nn.Module):
 
         # 合并 ALIGNN 和温度压力输出
         combined = torch.cat([graph_output, temp_pressure_output], dim=1)
-
+        # Batch Normalization
+        # normed_combined = self.batch_norm(combined)
         # 最后预测吸附量
         output = self.fc1(combined)
+        #output = self.fc1(normed_combined)
         output = F.relu(output)
         output = self.fc2(output)
-        output = F.relu(output)
-        output = self.fc3(output)
         output = F.relu(output)
         output = self.final(output)
         # output = F.relu(output)
