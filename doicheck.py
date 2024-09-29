@@ -1,9 +1,25 @@
 import os
-import pandas as pd
+import csv
 import re
 
 def extract_data_from_file(file_path):
-    with open(file_path, 'r') as file:
+    name = None
+    # Read the CSV file using the csv module
+    try:
+        with open(file_path, 'r', newline='', encoding='utf-8') as csvfile:
+            reader = csv.reader(csvfile)
+            rows = list(reader)
+            # Get the value from the second column and the ninth row (row index 8, column index 1)
+            if len(rows) > 8 and len(rows[8]) > 1:
+                name = rows[8][1]
+            else:
+                name = "Data not found"
+    except Exception as e:
+        print(f"Error reading {file_path}: {e}")
+        return None  # Return None if there is an error
+
+    # Read the file content for DOI search
+    with open(file_path, 'r', encoding='utf-8') as file:
         file_content = file.readlines()
 
     # Look for DOI within the file content
@@ -22,19 +38,18 @@ def extract_data_from_file(file_path):
     filename = file_path.split('/')[-1]
     match = re.match(r'(\w+)-(\w+)-(\d+)', filename)
     if not match:
-        return pd.DataFrame()  # Skip files that do not match the expected format
+        return None  # Skip files that do not match the expected format
 
     zeolite_type, adsorbate, temperature = match.groups()
 
-    # Create a DataFrame with the necessary columns
-    df_data = pd.DataFrame({
-        "zeolite_type": [zeolite_type],
-        "adsorbate": [adsorbate],
-        "temperature": [temperature],
-        "doi": [doi]
-    })
-
-    return df_data
+    # Return a dictionary with the necessary data
+    return {
+        "zeolite_type": zeolite_type,
+        "adsorbate": adsorbate,
+        "temperature": temperature,
+        "doi": doi,
+        "name": name
+    }
 
 def process_files_in_directory(directory_path, output_file):
     all_data = []
@@ -44,14 +59,17 @@ def process_files_in_directory(directory_path, output_file):
         for file in files:
             if file.endswith(".csv"):
                 file_path = os.path.join(root, file)
-                df = extract_data_from_file(file_path)
-                if not df.empty:
-                    all_data.append(df)
+                data = extract_data_from_file(file_path)
+                if data:
+                    all_data.append(data)
 
-    # Combine all dataframes into a single dataframe
+    # Write the combined data to an output CSV file
     if all_data:
-        combined_df = pd.concat(all_data, ignore_index=True)
-        combined_df.to_csv(output_file, index=False)
+        with open(output_file, 'w', newline='', encoding='utf-8') as csvfile:
+            fieldnames = ["zeolite_type", "adsorbate", "temperature", "doi", "name"]
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(all_data)
         print(f"Data successfully extracted to {output_file}")
     else:
         print("No valid data found in the directory.")

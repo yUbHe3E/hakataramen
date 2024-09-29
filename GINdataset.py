@@ -2,9 +2,9 @@ import os
 import re
 import numpy as np
 import torch
-import pandas as pd
 from torch_geometric.data import Data
 from torch.utils.data import Dataset
+import pandas as pd
 
 # 清理字符串并转换浮点数
 def clean_float(value):
@@ -51,17 +51,32 @@ def read_cif(file_path):
 
     return atomic_species, np.array(fractional_coords), a, b, c
 
-# 定义范德华半径（单位: Å）
+# 定义原子特性，包括 O₂⁻(H₂O) 作为独立物种的质量和电子结构信息
+atom_properties = {
+    'Al': {'mass': 26.98, 'electrons': 13, 'valence': 3},
+    'C': {'mass': 12.01, 'electrons': 6, 'valence': 4},
+    'N': {'mass': 14.01, 'electrons': 7, 'valence': 5},
+    'O': {'mass': 16.00, 'electrons': 8, 'valence': 6},
+    'P': {'mass': 30.97, 'electrons': 15, 'valence': 5},
+    'Si': {'mass': 28.09, 'electrons': 14, 'valence': 4},
+    'O2-(H2O)': {'mass': 18.015 + 16.00, 'electrons': 10, 'valence': 8},  # 水+氧
+    'K': {'mass': 39.10, 'electrons': 19, 'valence': 1},  # 钾元素
+    'Na': {'mass': 22.99, 'electrons': 11, 'valence': 1},  # 钠元素
+    'Li': {'mass': 6.94, 'electrons': 3, 'valence': 1},    # 锂元素
+}
+
 van_der_waals_radius = {
     'Al': 1.84,  # 铝
     'C': 1.70,   # 碳
     'N': 1.55,   # 氮
     'O': 1.52,   # 氧
-    'O2-(H2O)': 1.52,  # 复杂形式，基于氧原子的范德华半径
+    'O2-(H2O)': 1.52,  # 基于氧原子的范德华半径
     'P': 1.80,   # 磷
-    'Si': 2.10   # 硅
+    'Si': 2.10,  # 硅
+    'K': 2.75,   # 钾元素
+    'Na': 2.27,  # 钠元素
+    'Li': 1.82   # 锂元素
 }
-
 
 def get_vdw_radius(atom):
     """ 根据原子符号返回范德华半径 """
@@ -73,7 +88,19 @@ def process_cif_file(file_path, species_to_onehot):
 
     # 将分数坐标转换为笛卡尔坐标
     cartesian_coords = np.array([[a * x, b * y, c * z] for x, y, z in fractional_coords])
-    node_features = np.array([species_to_onehot[species] for species in atomic_species])
+
+    # 生成节点特征，包含原子种类、质量、电子结构等信息
+    node_features = []
+    for species in atomic_species:
+        onehot = species_to_onehot[species]  # 原子种类的 one-hot 编码
+        mass = atom_properties[species]['mass']  # 原子质量
+        electrons = atom_properties[species]['electrons']  # 原子电子数
+        valence = atom_properties[species]['valence']  # 原子价电子数
+        # 将所有特征拼接成节点特征
+        node_feature = np.concatenate([onehot, [mass, electrons, valence]])
+        node_features.append(node_feature)
+    # print(node_features)
+    node_features = np.array(node_features)
 
     edge_index = []
     num_atoms = len(cartesian_coords)
@@ -94,40 +121,12 @@ def process_cif_file(file_path, species_to_onehot):
 
     edge_index = np.array(edge_index).T
 
-    # 创建线图的边
-    # 创建线图的边
-    line_graph_edges = []
-    num_edges = edge_index.shape[1]  # 原图中的边数量
-
-    for k in range(num_edges):
-        for l in range(k + 1, num_edges):
-            if len(set(edge_index[:, k]).intersection(set(edge_index[:, l]))) > 0:
-                line_graph_edges.append([k, l])
-
-    line_graph_edges = np.array(line_graph_edges).T
-
     # 转换为 PyTorch tensor 格式
     node_features = torch.tensor(node_features, dtype=torch.float)
     edge_index = torch.tensor(edge_index, dtype=torch.long)
-    line_graph_edges = torch.tensor(line_graph_edges, dtype=torch.long)
 
-    # 生成 edge_index 后检查
-    max_index = max(edge_index.flatten().tolist())
-    num_atoms = len(cartesian_coords)
-    if max_index >= num_atoms:
-        print(f"edge_index contains an out-of-bound index {max_index}, but only {num_atoms} atoms are available.",file_path)
-        raise ValueError(
-            f"edge_index contains an out-of-bound index {max_index}, but only {num_atoms} atoms are available.")
-
-    # 生成 line_graph_edge_index 后检查
-    max_line_graph_index = max(line_graph_edges.flatten().tolist())
-    if max_line_graph_index >= num_edges:
-        print(f"line_graph_edge_index contains an out-of-bound index {max_line_graph_index}, but only {num_atoms} atoms are available.",
-              file_path)
-        raise ValueError(
-            f"line_graph_edge_index contains an out-of-bound index {max_line_graph_index}, but only {num_atoms} atoms are available.")
-
-    return Data(x=node_features, edge_index=edge_index, line_graph_edge_index=line_graph_edges)
+    # 创建图数据
+    return Data(x=node_features, edge_index=edge_index)
 
 # 动态构建原子类型集
 def build_unique_species(directory):
@@ -137,18 +136,24 @@ def build_unique_species(directory):
             file_path = os.path.join(directory, filename)
             atomic_species, _, _, _, _ = read_cif(file_path)
             species_set.update(atomic_species)
-    print(sorted(list(species_set)))
     return sorted(list(species_set))
+
+
 
 # 自定义 PyTorch 数据集类
 class AdsorptionDataset(Dataset):
-    def __init__(self, csv_file, cif_directory, mean_temp_pressure, std_temp_pressure, mean_adsorption, std_adsorption):
-        self.data_frame = pd.read_excel(csv_file)  # 读取 Excel 文件
-        self.cif_directory = cif_directory  # CIF 文件的目录
+    def __init__(self, csv_file, cif_directory, mean_temp_pressure, std_temp_pressure, mean_adsorption, std_adsorption, Temp_lambda, pressure_lambda, adsorption_lambda):
+        self.data_frame = pd.read_excel(csv_file)
+        self.cif_directory = cif_directory
+
         self.mean_temp_pressure = mean_temp_pressure
         self.std_temp_pressure = std_temp_pressure
         self.mean_adsorption = mean_adsorption
         self.std_adsorption = std_adsorption
+
+        self.Temp_lambda = Temp_lambda
+        self.pressure_lambda = pressure_lambda
+        self.adsorption_lambda = adsorption_lambda
 
         # 构建统一的原子类型集
         self.unique_species = build_unique_species(cif_directory)
@@ -163,14 +168,13 @@ class AdsorptionDataset(Dataset):
         pressure = row['Pressure(Bar)']
         adsorption = row['total_adsorption(mmol/g)']
         zeolite_type = row['zeolite_type']
-        type = row['Type']
-        # print(zeolite_type)
+        # type = row['Type']
+
         # 匹配CIF文件
         cif_file = None
         for filename in os.listdir(self.cif_directory):
             if filename.startswith(zeolite_type) and filename.endswith(".cif_"):
                 cif_file = os.path.join(self.cif_directory, filename)
-                # print(cif_file)
                 break
 
         if cif_file is None:
@@ -179,52 +183,97 @@ class AdsorptionDataset(Dataset):
         # 获取图数据
         graph_data = process_cif_file(cif_file, self.species_to_onehot)
 
+        # 对吸附量进行 Box-Cox 变换
+        if self.Temp_lambda != 0:
+            temp_boxcox = (np.power(temp+ 1e-20, self.Temp_lambda) - 1) / self.Temp_lambda
+        else:
+            temp_boxcox = np.log(temp+ 1e-20)
+
+        if self.pressure_lambda != 0:
+            pressure_boxcox = (np.power(pressure+ 1e-20, self.pressure_lambda) - 1) / self.pressure_lambda
+        else:
+            pressure_boxcox = np.log(pressure+ 1e-20)
+
+        # 对吸附量进行 Box-Cox 变换
+        if self.adsorption_lambda != 0:
+            adsorption_boxcox = (np.power(adsorption+ 1e-20, self.adsorption_lambda) - 1) / self.adsorption_lambda
+        else:
+            adsorption_boxcox = np.log(adsorption+ 1e-20)
+
         # 归一化温度、压力和type
-        temp_pressure = torch.tensor([temp, pressure, type], dtype=torch.float)
+        temp_pressure = torch.tensor([temp_boxcox, pressure_boxcox], dtype=torch.float)#, type
         temp_pressure = (temp_pressure - self.mean_temp_pressure) / self.std_temp_pressure
 
         # 归一化 adsorption
-        normalized_adsorption = (adsorption - self.mean_adsorption) / self.std_adsorption
+        normalized_adsorption = (adsorption_boxcox - self.mean_adsorption) / self.std_adsorption
 
         # 将归一化后的温度、压力和吸附量添加到 Data 对象中
         graph_data.temp_pressure = temp_pressure
-        graph_data.y = torch.tensor(normalized_adsorption, dtype=torch.float)  # 吸附量作为标签
+        graph_data.y = torch.tensor(normalized_adsorption, dtype=torch.float)
 
         return graph_data
 
-def calculate_normalization_params(data_frame):
+
+def calculate_normalization_params(data_frame,Temp_lambda, pressure_lambda, adsorption_lambda):
     temps = data_frame['Temp'].values
     pressures = data_frame['Pressure(Bar)'].values
     types = data_frame['Type'].values
     adsorptions = data_frame['total_adsorption(mmol/g)'].values
+    # 对吸附量进行 Box-Cox 变换
+    if Temp_lambda != 0:
+        temp_boxcox = (np.power(temps+ 1e-20, Temp_lambda) - 1) / Temp_lambda
+    else:
+        temp_boxcox = np.log(temps+ 1e-20)
 
+    if pressure_lambda != 0:
+        pressure_boxcox = (np.power(pressures+ 1e-20, pressure_lambda) - 1) / pressure_lambda
+    else:
+        pressure_boxcox = np.log(pressures+ 1e-20)
+
+    # 对吸附量进行 Box-Cox 变换
+    if adsorption_lambda != 0:
+        adsorption_boxcox = (np.power(adsorptions+ 1e-20, adsorption_lambda) - 1) / adsorption_lambda
+    else:
+        adsorption_boxcox = np.log(adsorptions+ 1e-20)
     # 计算温度、压力、type 和 adsorption 的均值和标准差
-    mean_temp_pressure = np.mean([temps, pressures, types], axis=1)
-    std_temp_pressure = np.std([temps, pressures, types], axis=1)
-    mean_adsorption = np.mean(adsorptions)
-    std_adsorption = np.std(adsorptions)
+    mean_temp_pressure = np.mean([temp_boxcox, pressure_boxcox], axis=1)#, types
+    std_temp_pressure = np.std([temp_boxcox, pressure_boxcox], axis=1)#, types
+    mean_adsorption = np.mean(adsorption_boxcox)
+    std_adsorption = np.std(adsorption_boxcox)
 
     return mean_temp_pressure, std_temp_pressure, mean_adsorption, std_adsorption
-# 示例用法
+
+# 动态构建原子类型集
+def build_unique_species(directory):
+    species_set = set()
+    for filename in os.listdir(directory):
+        if filename.endswith(".cif") or filename.endswith(".cif_"):
+            file_path = os.path.join(directory, filename)
+            atomic_species, _, _, _, _ = read_cif(file_path)
+            species_set.update(atomic_species)
+    print(sorted(list(species_set)))
+    return sorted(list(species_set))
+
 if __name__ == '__main__':
     csv_file = 'database.xlsx'  # 包含温度、压力、吸附量和沸石种类的 Excel 文件
     cif_directory = './cif_file/'  # CIF 文件的目录
+    Temp_lambda, pressure_lambda, adsorption_lambda = -3.111674466482276, 0.12938587453917788, 0.2782773034110868
     mean_temp_pressure, std_temp_pressure, mean_adsorption, std_adsorption = calculate_normalization_params(
-        pd.read_excel(csv_file))
+        pd.read_excel(csv_file), Temp_lambda, pressure_lambda, adsorption_lambda)
     print(mean_temp_pressure, std_temp_pressure, mean_adsorption, std_adsorption)
     # 创建数据集实例
     adsorption_dataset = AdsorptionDataset(csv_file=csv_file, cif_directory=cif_directory,
                             mean_temp_pressure=mean_temp_pressure, std_temp_pressure=std_temp_pressure,
-                            mean_adsorption=mean_adsorption, std_adsorption=std_adsorption)
+                            mean_adsorption=mean_adsorption, std_adsorption=std_adsorption, Temp_lambda=Temp_lambda, pressure_lambda=pressure_lambda, adsorption_lambda=adsorption_lambda)
 
     print(adsorption_dataset)
     # 数据集长度
     print(f"Dataset size: {len(adsorption_dataset)}")
 
     # 获取第一个样本
-    # sample = adsorption_dataset[10]
+    sample = adsorption_dataset[500]
     # for sample in adsorption_dataset:
-    #     print(sample)
-    #     print("Graph Data:", sample)
-    #     print("Temperature and Pressure:", sample.temp_pressure)
-    #     print("Adsorption Capacity (label):", sample.y)
+    print(sample)
+    print("Graph Data:", sample.edge_index)
+    print("Temperature and Pressure:", sample.temp_pressure)
+    print("Adsorption Capacity (label):", sample.y)

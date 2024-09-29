@@ -10,6 +10,8 @@ def train(model, data_loader, optimizer, criterion, device):
     model.train()
     total_loss = 0
     for batch_data in data_loader:
+        # print(len(batch_data))
+        # exit()
         # 将图数据部分和 temp_pressure 分开处理
         batch_data = batch_data.to(device)
         num_nodes = batch_data.x.size(0)
@@ -104,8 +106,8 @@ def main():
     val_size = len(dataset) - train_size
     train_dataset, val_dataset = torch.utils.data.random_split(dataset, [train_size, val_size])
 
-    train_loader = DataLoader(train_dataset, batch_size=43, shuffle=True)
-    val_loader = DataLoader(val_dataset, batch_size=79, shuffle=True)
+    train_loader = DataLoader(train_dataset, batch_size=43, shuffle=False)
+    val_loader = DataLoader(val_dataset, batch_size=79, shuffle=False)
 
     # 设备选择 (GPU 或 CPU)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
