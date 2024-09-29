@@ -142,6 +142,9 @@ def build_unique_species(directory):
 class AdsorptionDataset(Dataset):
     def __init__(self, csv_file, cif_directory, mean_temp_pressure, std_temp_pressure, mean_adsorption, std_adsorption, Temp_lambda, pressure_lambda, adsorption_lambda):
         self.data_frame = pd.read_excel(csv_file)
+        one_hot_encoded = pd.get_dummies(self.data_frame['Type'], prefix='Type').astype(int)
+        one_hot_encoded_array = one_hot_encoded.to_numpy()
+        self.data_frame['Type'] = list(one_hot_encoded_array)
         self.cif_directory = cif_directory
 
         self.mean_temp_pressure = mean_temp_pressure
@@ -166,7 +169,8 @@ class AdsorptionDataset(Dataset):
         pressure = row['Pressure(Bar)']
         adsorption = row['total_adsorption(mmol/g)']
         zeolite_type = row['zeolite_type']
-        # type = row['Type']
+        type = row['Type']
+        # print(type)
 
         # 匹配CIF文件
         cif_file = None
@@ -201,7 +205,9 @@ class AdsorptionDataset(Dataset):
         # 归一化温度、压力和type
         temp_pressure = torch.tensor([temp_boxcox, pressure_boxcox], dtype=torch.float)#, type
         temp_pressure = (temp_pressure - self.mean_temp_pressure) / self.std_temp_pressure
-
+        type_tensor = torch.tensor(type, dtype=torch.float)
+        temp_pressure = torch.cat((temp_pressure, type_tensor))
+        # print(temp_pressure)
         # 归一化 adsorption
         normalized_adsorption = (adsorption_boxcox - self.mean_adsorption) / self.std_adsorption
 

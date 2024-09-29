@@ -68,13 +68,11 @@ class FullModel(nn.Module):
 
         # 使用 DNN 替代全连接层
         self.dnn = nn.Sequential(
-            nn.Linear(2 * gin_output_dim, 64),  # GIN 和温度压力输出合并
+            nn.Linear(2 * gin_output_dim, 16),  # GIN 和温度压力输出合并
             nn.ReLU(),
-            nn.Linear(64, 64),
+            nn.Linear(16, 8),
             nn.ReLU(),
-            nn.Linear(64, 64),
-            nn.ReLU(),
-            nn.Linear(64, 1)  # 最后回归输出 1 个值
+            nn.Linear(8, 1)  # 最后回归输出 1 个值
         )
 
 
