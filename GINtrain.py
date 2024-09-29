@@ -37,8 +37,6 @@ def train(model, data_loader, optimizer, criterion, device, mean_y, std_y, adsor
         # predictions = b_c(predictions, adsorption_lambda) - 1e-20
         # labels = b_c(labels, adsorption_lambda) - 1e-20
 
-
-
         # 更新模型参数
         optimizer.step()
 
@@ -96,8 +94,8 @@ def b_c(y_pred_transformed, adsorption_lambda):
 # 主训练循环
 def main():
     # 归一化参数
-    mean_temp_pressure = torch.tensor([ 0.32137037, -1.86010426,  2.61455749])
-    std_temp_pressure = torch.tensor([1.24414074e-09, 2.04740326e+00, 1.62954113e+00])
+    mean_temp_pressure = torch.tensor([0.32137037, -1.86010426])
+    std_temp_pressure = torch.tensor([1.24414074e-09, 2.04740326e+00])
     mean_adsorption = torch.tensor(-0.22691460708826203)
     std_adsorption = torch.tensor(1.152552597935884)
     Temp_lambda, pressure_lambda, adsorption_lambda = -3.111674466482276, 0.12938587453917788, 0.2782773034110868
@@ -131,10 +129,10 @@ def main():
     # 初始化模型
     model = FullModel(
         gin_node_in_dim=13,  # 假设每个节点的特征维度为 13
-        gin_node_hidden_dim=32,
-        gin_num_layers=7,
+        gin_node_hidden_dim=8,
+        gin_num_layers=2,
         gin_output_dim=8,
-        temp_pressure_dim=2  # 温度和压力是 3 维向量
+        temp_pressure_dim=11  # 温度和压力是 3 维向量
     ).to(device)
 
     # 检查是否存在已保存的模型文件
@@ -153,17 +151,17 @@ def main():
 
     # 损失函数和优化器
     criterion = torch.nn.MSELoss()  # 使用均方误差损失
-    optimizer = optim.Adam(model.parameters(), lr=0.001, weight_decay=1e-5)
+    optimizer = optim.Adam(model.parameters(), lr=0.0005, weight_decay=1e-5)
     # optimizer = optim.Adagrad(model.parameters(), lr=0.001)
 
     # 训练循环
     num_epochs = 5000
-    best_val_loss = 1000
+    best_val_loss = 0.1716
     # scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=5, verbose=True)
 
     for epoch in range(num_epochs):
         train_loss = train(model, train_loader, optimizer, criterion, device, mean_adsorption, std_adsorption, adsorption_lambda)
-        val_loss, pre, y = validate(model, train_loader, criterion, device, mean_adsorption, std_adsorption, adsorption_lambda)
+        val_loss, pre, y = validate(model, val_loader, criterion, device, mean_adsorption, std_adsorption, adsorption_lambda)
 
         print(f'Epoch {epoch + 1}/{num_epochs}, Train Loss: {train_loss:.4f}, Validation Loss: {val_loss:.4f}')
 
