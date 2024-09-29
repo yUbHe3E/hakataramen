@@ -138,8 +138,6 @@ def build_unique_species(directory):
             species_set.update(atomic_species)
     return sorted(list(species_set))
 
-
-
 # 自定义 PyTorch 数据集类
 class AdsorptionDataset(Dataset):
     def __init__(self, csv_file, cif_directory, mean_temp_pressure, std_temp_pressure, mean_adsorption, std_adsorption, Temp_lambda, pressure_lambda, adsorption_lambda):
@@ -217,7 +215,7 @@ class AdsorptionDataset(Dataset):
 def calculate_normalization_params(data_frame,Temp_lambda, pressure_lambda, adsorption_lambda):
     temps = data_frame['Temp'].values
     pressures = data_frame['Pressure(Bar)'].values
-    types = data_frame['Type'].values
+    # types = data_frame['Type'].values
     adsorptions = data_frame['total_adsorption(mmol/g)'].values
     # 对吸附量进行 Box-Cox 变换
     if Temp_lambda != 0:

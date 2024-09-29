@@ -96,11 +96,11 @@ def b_c(y_pred_transformed, adsorption_lambda):
 # 主训练循环
 def main():
     # 归一化参数
-    mean_temp_pressure = torch.tensor([ 0.31664064, -1.38404704])#[ 0.32137037, -1.86010426,  2.61455749])
-    std_temp_pressure = torch.tensor([9.53920778e-10, 1.56445409e+00])#[1.24414074e-09, 2.04740326e+00, 1.62954113e+00])
-    mean_adsorption = torch.tensor(-0.10786973068427637)#-0.22691460708826203)
-    std_adsorption = torch.tensor(1.0805041688597548)#1.152552597935884)
-    Temp_lambda, pressure_lambda, adsorption_lambda = -3.1581542779028915, 0.25255249636993626, 0.4411252736891681#-3.111674466482276, 0.12938587453917788, 0.2782773034110868
+    mean_temp_pressure = torch.tensor([ 0.32137037, -1.86010426,  2.61455749])
+    std_temp_pressure = torch.tensor([1.24414074e-09, 2.04740326e+00, 1.62954113e+00])
+    mean_adsorption = torch.tensor(-0.22691460708826203)
+    std_adsorption = torch.tensor(1.152552597935884)
+    Temp_lambda, pressure_lambda, adsorption_lambda = -3.111674466482276, 0.12938587453917788, 0.2782773034110868
 
     # 加载数据集
     csv_file = 'database.xlsx'
@@ -130,7 +130,7 @@ def main():
     # device = torch.device('cpu')
     # 初始化模型
     model = FullModel(
-        gin_node_in_dim=3,  # 假设每个节点的特征维度为 13
+        gin_node_in_dim=13,  # 假设每个节点的特征维度为 13
         gin_node_hidden_dim=32,
         gin_num_layers=7,
         gin_output_dim=8,

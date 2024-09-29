@@ -5,7 +5,7 @@ from scipy import stats
 
 
 # 读取数据
-data_frame = pd.read_excel('database-co2.xlsx')
+data_frame = pd.read_excel('database.xlsx')
 Temp,Temp_lambda = stats.boxcox(data_frame['Temp'] + 1e-20)
 Pressure, pressure_lambda = stats.boxcox(data_frame['Pressure(Bar)'] + 1e-20)
 Asor, adsorption_lambda = stats.boxcox(data_frame['total_adsorption(mmol/g)'] + 1e-20)
