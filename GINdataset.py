@@ -142,9 +142,9 @@ def build_unique_species(directory):
 class AdsorptionDataset(Dataset):
     def __init__(self, csv_file, cif_directory, mean_temp_pressure, std_temp_pressure, mean_adsorption, std_adsorption, Temp_lambda, pressure_lambda, adsorption_lambda):
         self.data_frame = pd.read_excel(csv_file)
-        one_hot_encoded = pd.get_dummies(self.data_frame['Type'], prefix='Type').astype(int)
+        one_hot_encoded = pd.get_dummies(self.data_frame['adsorbate'], prefix='adsorbate').astype(int)
         one_hot_encoded_array = one_hot_encoded.to_numpy()
-        self.data_frame['Type'] = list(one_hot_encoded_array)
+        self.data_frame['adsorbate'] = list(one_hot_encoded_array)
         self.cif_directory = cif_directory
 
         self.mean_temp_pressure = mean_temp_pressure
@@ -165,11 +165,11 @@ class AdsorptionDataset(Dataset):
 
     def __getitem__(self, idx):
         row = self.data_frame.iloc[idx]
-        temp = row['Temp']
-        pressure = row['Pressure(Bar)']
-        adsorption = row['total_adsorption(mmol/g)']
+        temp = row['temperature']
+        pressure = row['Pressure (bar)']
+        adsorption = row['Adsorption (mmol/g)']
         zeolite_type = row['zeolite_type']
-        type = row['Type']
+        type = row['adsorbate']
         # print(type)
 
         # 匹配CIF文件
@@ -219,10 +219,10 @@ class AdsorptionDataset(Dataset):
 
 
 def calculate_normalization_params(data_frame,Temp_lambda, pressure_lambda, adsorption_lambda):
-    temps = data_frame['Temp'].values
-    pressures = data_frame['Pressure(Bar)'].values
+    temps = data_frame['temperature'].values
+    pressures = data_frame['Pressure (bar)'].values
     # types = data_frame['Type'].values
-    adsorptions = data_frame['total_adsorption(mmol/g)'].values
+    adsorptions = data_frame['Adsorption (mmol/g)'].values
     # 对吸附量进行 Box-Cox 变换
     if Temp_lambda != 0:
         temp_boxcox = (np.power(temps+ 1e-20, Temp_lambda) - 1) / Temp_lambda
@@ -259,9 +259,9 @@ def build_unique_species(directory):
     return sorted(list(species_set))
 
 if __name__ == '__main__':
-    csv_file = 'database.xlsx'  # 包含温度、压力、吸附量和沸石种类的 Excel 文件
+    csv_file = 'newdata/new_database.xlsx'  # 包含温度、压力、吸附量和沸石种类的 Excel 文件
     cif_directory = './cif_file/'  # CIF 文件的目录
-    Temp_lambda, pressure_lambda, adsorption_lambda = -3.111674466482276, 0.12938587453917788, 0.2782773034110868
+    Temp_lambda, pressure_lambda, adsorption_lambda = 2.2236759863400444, 0.09751280036661507, 0.08329655439745963
     mean_temp_pressure, std_temp_pressure, mean_adsorption, std_adsorption = calculate_normalization_params(
         pd.read_excel(csv_file), Temp_lambda, pressure_lambda, adsorption_lambda)
     print(mean_temp_pressure, std_temp_pressure, mean_adsorption, std_adsorption)
@@ -275,7 +275,7 @@ if __name__ == '__main__':
     print(f"Dataset size: {len(adsorption_dataset)}")
 
     # 获取第一个样本
-    sample = adsorption_dataset[500]
+    sample = adsorption_dataset[0]
     # for sample in adsorption_dataset:
     print(sample)
     print("Graph Data:", sample.edge_index)

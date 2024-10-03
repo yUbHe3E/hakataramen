@@ -27,15 +27,17 @@ def train(model, data_loader, optimizer, criterion, device, mean_y, std_y, adsor
         # 模型前向传播
         predictions = model(batch_data, temp_pressure)
 
+        predictions = predictions * std_y + mean_y
+        labels = labels * std_y + mean_y
+
+        predictions = b_c(predictions, adsorption_lambda) - 1e-20
+        labels = b_c(labels, adsorption_lambda) - 1e-20
+
         # 计算损失
         loss = criterion(predictions, labels)
         loss.backward()
 
-        # predictions = predictions * std_y + mean_y
-        # labels = labels * std_y + mean_y
-        #
-        # predictions = b_c(predictions, adsorption_lambda) - 1e-20
-        # labels = b_c(labels, adsorption_lambda) - 1e-20
+
 
         # 更新模型参数
         optimizer.step()
@@ -67,15 +69,17 @@ def validate(model, data_loader, criterion, device, mean_y, std_y, adsorption_la
             # 模型前向传播
             predictions = model(batch_data, temp_pressure)
 
-            # 计算损失
-            loss = criterion(predictions, labels)
-            total_loss += loss.item()
-
             predictions = predictions * std_y + mean_y
             labels = labels * std_y + mean_y
 
             predictions = b_c(predictions, adsorption_lambda) - 1e-20
             labels = b_c(labels, adsorption_lambda) - 1e-20
+
+            # 计算损失
+            loss = criterion(predictions, labels)
+            total_loss += loss.item()
+
+
 
 
 
@@ -94,14 +98,14 @@ def b_c(y_pred_transformed, adsorption_lambda):
 # 主训练循环
 def main():
     # 归一化参数
-    mean_temp_pressure = torch.tensor([0.32137037, -1.86010426])
-    std_temp_pressure = torch.tensor([1.24414074e-09, 2.04740326e+00])
-    mean_adsorption = torch.tensor(-0.22691460708826203)
-    std_adsorption = torch.tensor(1.152552597935884)
-    Temp_lambda, pressure_lambda, adsorption_lambda = -3.111674466482276, 0.12938587453917788, 0.2782773034110868
+    mean_temp_pressure = torch.tensor([ 1.49388858e+05, -6.14375926e-01])
+    std_temp_pressure = torch.tensor([5.18899978e+04, 1.98386169e+00])
+    mean_adsorption = torch.tensor(0.1844099485394032)
+    std_adsorption = torch.tensor(1.3112418647922621)
+    Temp_lambda, pressure_lambda, adsorption_lambda = 2.2236759863400444, 0.09751280036661507, 0.08329655439745963
 
     # 加载数据集
-    csv_file = 'database.xlsx'
+    csv_file = 'newdata/new_database.xlsx'
     cif_directory = './cif_file/'
     dataset = AdsorptionDataset(
         csv_file=csv_file,
@@ -132,7 +136,7 @@ def main():
         gin_node_hidden_dim=8,
         gin_num_layers=2,
         gin_output_dim=8,
-        temp_pressure_dim=11  # 温度和压力是 3 维向量
+        temp_pressure_dim=15  # 温度和压力是 3 维向量
     ).to(device)
 
     # 检查是否存在已保存的模型文件
