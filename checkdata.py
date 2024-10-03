@@ -13,21 +13,21 @@ Asor, adsorption_lambda = stats.boxcox(data_frame['Adsorption (mmol/g)'] + 1e-20
 print(Temp_lambda,pressure_lambda,adsorption_lambda,)
 # 绘制温度的直方图
 plt.hist(Temp, bins=30, edgecolor='k')
-plt.title('Temperature Distribution')
+plt.title('Temperature Distribution(after boxcox)')
 plt.xlabel('Temperature')
 plt.ylabel('Frequency')
 plt.show()
 
 # 绘制压力的直方图
 plt.hist(Pressure, bins=30, edgecolor='k')
-plt.title('Pressure Distribution')
+plt.title('Pressure Distribution(after boxcox)')
 plt.xlabel('Pressure (Bar)')
 plt.ylabel('Frequency')
 plt.show()
 
 # 绘制吸附量的直方图
 plt.hist(Asor, bins=30, edgecolor='k')
-plt.title('Adsorption Distribution')
+plt.title('Adsorption Distribution(after boxcox)')
 plt.xlabel('Adsorption (mmol/g)')
 plt.ylabel('Frequency')
 plt.show()
@@ -39,22 +39,22 @@ plt.show()
 # plt.show()
 
 # 绘制温度的直方图
-plt.hist(data_frame['Temp'], bins=30, edgecolor='k')
-plt.title('Temperature Distribution1')
+plt.hist(data_frame['temperature'], bins=30, edgecolor='k')
+plt.title('Temperature Distribution')
 plt.xlabel('Temperature')
 plt.ylabel('Frequency')
 plt.show()
 
 # 绘制压力的直方图
-plt.hist(data_frame['Pressure(Bar)'], bins=30, edgecolor='k')
-plt.title('Pressure Distribution1')
+plt.hist(data_frame['Pressure (bar)'], bins=30, edgecolor='k')
+plt.title('Pressure Distribution')
 plt.xlabel('Pressure (Bar)')
 plt.ylabel('Frequency')
 plt.show()
 
 # 绘制吸附量的直方图
-plt.hist(data_frame['total_adsorption(mmol/g)'], bins=30, edgecolor='k')
-plt.title('Adsorption Distribution1')
+plt.hist(data_frame['Adsorption (mmol/g)'], bins=30, edgecolor='k')
+plt.title('Adsorption Distribution')
 plt.xlabel('Adsorption (mmol/g)')
 plt.ylabel('Frequency')
 plt.show()
