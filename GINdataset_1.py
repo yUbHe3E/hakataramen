@@ -6,6 +6,7 @@ from sympy import false
 from torch_geometric.data import Data
 from torch.utils.data import Dataset
 import pandas as pd
+from pymatgen.io.cif import CifParser
 
 # 清理字符串并转换浮点数
 def clean_float(value):
@@ -14,43 +15,48 @@ def clean_float(value):
     return float(clean_value)
 
 # 从CIF文件读取原子坐标和晶胞参数
-def read_cif(file_path):
-    with open(file_path, 'r') as f:
-        lines = f.readlines()
+from pymatgen.core import Structure
 
-    a = b = c = alpha = beta = gamma = None
+def read_cif(file_path, occupancy_tolerance=10.0):
+    """
+    使用 pymatgen 来解析 CIF 文件并返回:
+      - atomic_species: [str, ...]  (如 ['Si', 'O', 'O', ...])
+      - frac_coords: ndarray shape (N, 3)
+      - cart_coords: ndarray shape (N, 3)
+      - a, b, c: 晶胞的 a,b,c
+      - alpha, beta, gamma: 晶胞角度(单位°)
+    """
+    # 用 CifParser 并传入 occupancy_tolerance
+    parser = CifParser(file_path, occupancy_tolerance=occupancy_tolerance)
+
+    structures = parser.get_structures()  # 自动解析 CIF, 处理对称操作
+    structure = structures[0]
+
+    # 从 structure 里取所有原子的化学符号 & 坐标
     atomic_species = []
-    fractional_coords = []
-    atom_site_started = False
+    frac_coords = []
+    cart_coords = []
 
-    for line in lines:
-        line = line.strip()
-        if not line or line.startswith('#'):
-            continue
-        if line.startswith('_cell_length_a'):
-            a = clean_float(line.split()[1])
-        elif line.startswith('_cell_length_b'):
-            b = clean_float(line.split()[1])
-        elif line.startswith('_cell_length_c'):
-            c = clean_float(line.split()[1])
-        elif line.startswith('_cell_angle_alpha'):
-            alpha = clean_float(line.split()[1])
-        elif line.startswith('_cell_angle_beta'):
-            beta = clean_float(line.split()[1])
-        elif line.startswith('_cell_angle_gamma'):
-            gamma = clean_float(line.split()[1])
-        elif line.startswith('_atom_site_label'):
-            atom_site_started = True
-        elif atom_site_started and line:
-            parts = line.split()
-            if len(parts) >= 5:
-                atomic_species.append(parts[1])
-                fractional_coords.append([float(parts[2]), float(parts[3]), float(parts[4])])
+    for site in structure.sites:
+        # site.species_string 可能是 'Si', 'O', 'O2-', 'Na1+' 等
+        # 如果只想要元素本身，可用 site.specie.symbol 或 site.species.elements[0].symbol
+        # 这里为了匹配你的 atom_properties 里的键名，建议只拿元素符号(不含电荷)
+        # 若结构中有混合占位或标注了电荷，需要再做映射。
+        element_symbol = list(site.species.keys())[0].symbol
+        atomic_species.append(element_symbol)
+        frac_coords.append(site.frac_coords)   # 分数坐标
+        cart_coords.append(site.coords)        # 笛卡尔坐标
 
-    if not all([a, b, c, alpha, beta, gamma]):
-        raise ValueError("Missing cell parameters in CIF file.")
+    frac_coords = np.array(frac_coords)
+    cart_coords = np.array(cart_coords)
 
-    return atomic_species, np.array(fractional_coords), a, b, c
+    # 获取晶胞参数
+    lattice = structure.lattice
+    a, b, c = lattice.a, lattice.b, lattice.c
+    alpha, beta, gamma = lattice.alpha, lattice.beta, lattice.gamma
+
+    return atomic_species, frac_coords, cart_coords, a, b, c, alpha, beta, gamma
+
 
 # 定义原子特性，包括 O₂⁻(H₂O) 作为独立物种的质量和电子结构信息
 atom_properties = {
@@ -85,49 +91,62 @@ def get_vdw_radius(atom):
 
 # 处理单个CIF文件并生成图数据
 def process_cif_file(file_path, species_to_onehot):
-    atomic_species, fractional_coords, a, b, c = read_cif(file_path)
+    # 用 pymatgen 读取并解析 CIF
+    (atomic_species, frac_coords, cartesian_coords,
+     a, b, c, alpha, beta, gamma) = read_cif(file_path)
 
-    # 将分数坐标转换为笛卡尔坐标
-    cartesian_coords = np.array([[a * x, b * y, c * z] for x, y, z in fractional_coords])
-
-    # 生成节点特征，包含原子种类、质量、电子结构等信息
+    # 构造节点特征
     node_features = []
     for species in atomic_species:
-        onehot = species_to_onehot[species]  # 原子种类的 one-hot 编码
-        mass = atom_properties[species]['mass']  # 原子质量
-        electrons = atom_properties[species]['electrons']  # 原子电子数
-        valence = atom_properties[species]['valence']  # 原子价电子数
-        # 将所有特征拼接成节点特征
+        # 若在 atom_properties 里没定义该元素，需要做一些默认处理 or 忽略
+        if species not in species_to_onehot:
+            # 如果你的 species_to_onehot 不包含此元素，可以做一个默认处理
+            # 也可以 raise Error，看你自己需求
+            print(f"Warning: {species} not in species_to_onehot! Using dummy one-hot.")
+            onehot = np.zeros(len(species_to_onehot), dtype=float)
+            mass = 0.0
+            electrons = 0.0
+            valence = 0.0
+        else:
+            onehot = species_to_onehot[species]
+            # 同样 atom_properties 若不存在也要处理一下
+            if species not in atom_properties:
+                mass = 0.0
+                electrons = 0.0
+                valence = 0.0
+            else:
+                mass = atom_properties[species]['mass']
+                electrons = atom_properties[species]['electrons']
+                valence = atom_properties[species]['valence']
+
         node_feature = np.concatenate([onehot, [mass, electrons, valence]])
         node_features.append(node_feature)
-    # print(node_features)
-    node_features = np.array(node_features)
 
+    node_features = np.array(node_features, dtype=float)
+
+    # 基于范德华半径的成键判断
     edge_index = []
     num_atoms = len(cartesian_coords)
-
-    # 生成 edge_index，基于范德华半径
     for i in range(num_atoms):
         for j in range(i + 1, num_atoms):
             dist = np.linalg.norm(cartesian_coords[i] - cartesian_coords[j])
 
-            # 获取两种原子之间的范德华半径
             radius_i = get_vdw_radius(atomic_species[i])
             radius_j = get_vdw_radius(atomic_species[j])
-            bond_threshold = radius_i + radius_j  # 两个原子的范德华半径之和
+            bond_threshold = radius_i/1.5 + radius_j/1.5
 
-            # 如果两原子之间的距离小于范德华半径的总和，就添加一条边
             if dist < bond_threshold:
                 edge_index.append([i, j])
 
     edge_index = np.array(edge_index).T
 
-    # 转换为 PyTorch tensor 格式
-    node_features = torch.tensor(node_features, dtype=torch.float)
+    # 构造 PyG Data
+    x = torch.tensor(node_features, dtype=torch.float)
     edge_index = torch.tensor(edge_index, dtype=torch.long)
+    data = Data(x=x, edge_index=edge_index)
 
-    # 创建图数据
-    return Data(x=node_features, edge_index=edge_index)
+    return data
+
 
 # 动态构建原子类型集
 def build_unique_species(directory):
@@ -271,9 +290,9 @@ def build_unique_species(directory):
     for filename in os.listdir(directory):
         if filename.endswith(".cif") or filename.endswith(".cif_"):
             file_path = os.path.join(directory, filename)
-            atomic_species, _, _, _, _ = read_cif(file_path)
+            atomic_species, frac_coords, cartesian_coords, a, b, c, alpha, beta, gamma = read_cif(file_path)
             species_set.update(atomic_species)
-    print(sorted(list(species_set)))
+    print('原子类型', sorted(list(species_set)))
     return sorted(list(species_set))
 
 if __name__ == '__main__':

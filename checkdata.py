@@ -2,31 +2,35 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy import stats
+print('read data...')
+import seaborn as sns
 
-
+sns.set_style('ticks')
+sns.set_context('talk')
 # 读取数据
-data_frame = pd.read_excel('newdata/new_database.xlsx')
+data_frame = pd.read_excel('newdata/nosmooth/database.xlsx')
+
 Temp,Temp_lambda = stats.boxcox(data_frame['temperature'] + 1e-20)
 Pressure, pressure_lambda = stats.boxcox(data_frame['Pressure (bar)'] + 1e-20)
 Asor, adsorption_lambda = stats.boxcox(data_frame['Adsorption (mmol/g)'] + 1e-20)
 # Type, Type_lambda = stats.boxcox(data_frame['Type'])
 print(Temp_lambda,pressure_lambda,adsorption_lambda,)
 # 绘制温度的直方图
-plt.hist(Temp, bins=30, edgecolor='k')
+sns.histplot(Temp, bins=30, edgecolor='k')
 plt.title('Temperature Distribution(after boxcox)')
 plt.xlabel('Temperature')
 plt.ylabel('Frequency')
 plt.show()
 
 # 绘制压力的直方图
-plt.hist(Pressure, bins=30, edgecolor='k')
+sns.histplot(Pressure, bins=30, edgecolor='k')
 plt.title('Pressure Distribution(after boxcox)')
 plt.xlabel('Pressure (Bar)')
 plt.ylabel('Frequency')
 plt.show()
 
 # 绘制吸附量的直方图
-plt.hist(Asor, bins=30, edgecolor='k')
+sns.histplot(Asor, bins=30, edgecolor='k')
 plt.title('Adsorption Distribution(after boxcox)')
 plt.xlabel('Adsorption (mmol/g)')
 plt.ylabel('Frequency')
@@ -39,21 +43,21 @@ plt.show()
 # plt.show()
 
 # 绘制温度的直方图
-plt.hist(data_frame['temperature'], bins=30, edgecolor='k')
+sns.histplot(data_frame['temperature'], bins=30, edgecolor='k')
 plt.title('Temperature Distribution')
 plt.xlabel('Temperature')
 plt.ylabel('Frequency')
 plt.show()
 
 # 绘制压力的直方图
-plt.hist(data_frame['Pressure (bar)'], bins=30, edgecolor='k')
+sns.histplot(data_frame['Pressure (bar)'], bins=30, edgecolor='k')
 plt.title('Pressure Distribution')
 plt.xlabel('Pressure (Bar)')
 plt.ylabel('Frequency')
 plt.show()
 
 # 绘制吸附量的直方图
-plt.hist(data_frame['Adsorption (mmol/g)'], bins=30, edgecolor='k')
+sns.histplot(data_frame['Adsorption (mmol/g)'], bins=30, edgecolor='k')
 plt.title('Adsorption Distribution')
 plt.xlabel('Adsorption (mmol/g)')
 plt.ylabel('Frequency')

@@ -11,7 +11,7 @@ from sklearn.model_selection import train_test_split
 import joblib
 from sklearn.metrics import mean_absolute_error, r2_score
 
-data = pd.read_csv('C:/Users/Hasee/Desktop/沸石ml/mldata.csv', encoding='gbk',header=0)
+data = pd.read_csv('mldata.csv', encoding='gbk',header=0)
 data = data.dropna(how='all')
 data = data[1:]
 print(data.columns)

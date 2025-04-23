@@ -9,14 +9,14 @@ def extract_data_from_file(file_path):
         print(file_content)
 
     # Identify the start of the data section
-    # data_start_index = None
-    # for idx, line in enumerate(file_content):
-    #     if "Pressure (bar)" in line.lower() and "Adsorption (mmol/g)" in line.lower():
-    #         data_start_index = idx
-    #         break
+    data_start_index = None
+    for idx, line in enumerate(file_content):
+        if "pressure" in line.lower() and "line" in line.lower(): #if "Pressure (bar)" in line.lower() and "Adsorption (mmol/g)" in line.lower():
+            data_start_index = idx
+            break
 
-    # if data_start_index is None:
-    #     return pd.DataFrame()  # Return an empty dataframe if no data found
+    if data_start_index is None:
+        return pd.DataFrame()  # Return an empty dataframe if no data found
 
     # Extract the zeolite type, adsorbate, and temperature from the filename
     filename = file_path.split('/')[-1]
@@ -27,13 +27,16 @@ def extract_data_from_file(file_path):
     zeolite_type, adsorbate, temperature = match.groups()
 
     # Read the relevant data section into a dataframe
-    # data_lines = file_content[data_start_index + 1:]
-    # data = [line.strip().split(',') for line in data_lines]
+    data_lines = file_content[data_start_index + 1:]
+    data = [line.strip().split(',') for line in data_lines]
 
     # Create a DataFrame with the necessary columns
-    data = pd.read_csv(file_path)
-    df_data = pd.DataFrame( data, columns=["Pressure (bar)", "Adsorption (mmol/g)"])
-    df_data = df_data[["Pressure (bar)", "Adsorption (mmol/g)"]].copy()
+    # data = pd.read_csv(file_path)
+    # df_data = pd.DataFrame( data, columns=["Pressure (bar)", "Adsorption (mmol/g)"])
+    # df_data = df_data[["Pressure (bar)", "Adsorption (mmol/g)"]].copy()
+
+    df_data = pd.DataFrame(data, columns=['line',"pressure", 'composition (CURLTUGMZLYLDI-UHFFFAOYSA-N)', "adsorption", 'total_adsorption'])
+    df_data = df_data[["pressure", "adsorption"]].copy()
 
     # Add the extracted zeolite type, adsorbate, and temperature to the dataframe
     df_data["zeolite_type"] = zeolite_type
@@ -66,6 +69,6 @@ def process_files_in_directory(directory_path, output_file):
 
 
 # Example usage
-directory_path = './newdata/2/'  # Replace with the path to your directory
+directory_path = './newdata/1/'  # Replace with the path to your directory
 output_file = 'combined_data.csv'  # Output file name
 process_files_in_directory(directory_path, output_file)
